@@ -18,7 +18,8 @@ const BALANCE_TTL_MS = 60_000
 const BALANCE_TIMEOUT_MS = 10_000
 const USAGE_TTL_MS = 2 * 60_000
 const USAGE_TIMEOUT_MS = 10_000
-const PLATFORM_USAGE_URL = 'https://platform.deepseek.com/api/v0/usage/cost'
+const ALERT_TTL_MS = 5 * 60_000
+const PLATFORM_USAGE_URL = 'https://platform.deepseek.com/api/v0/usage/by_api_key/cost'
 const TZ_SECONDS = 8 * 3600
 
 // 高峰时段（北京时间）：周一至周五 09:00–12:00、14:00–18:00，不含法定节假日。
@@ -194,6 +195,34 @@ function platformCost(payload) {
   return { total: round4(total), byModel }
 }
 
+/** Read the platform-configured balance alert bound (the "余额预警" set on platform.deepseek.com). */
+async function fetchAlertBound(account) {
+  if (account === undefined || typeof account.getPlatformSession !== 'function') return null
+  let session
+  try { session = await account.getPlatformSession() } catch (_err) { return null }
+  if (session === null || session === undefined) return null
+  try {
+    const response = await fetch('https://platform.deepseek.com/auth-api/v0/users/current', {
+      method: 'GET',
+      headers: { 'x-dsh-auth-token': session.token, ...(session.requestHeaders || {}) },
+      signal: AbortSignal.timeout(USAGE_TIMEOUT_MS),
+    })
+    if (!response.ok) return null
+    const json = await response.json()
+    const biz = json && json.data ? json.data.biz_data : undefined
+    const alert = biz && biz.balance_alert ? biz.balance_alert : undefined
+    if (alert === undefined || alert === null) return null
+    const read = (side) => {
+      const entry = alert[side]
+      if (entry === undefined || entry === null) return { enabled: false, bound: 0 }
+      return { enabled: entry.enabled === true, bound: Number(entry.alert_bound) || 0 }
+    }
+    return { CNY: read('CNY'), USD: read('USD'), raw: alert }
+  } catch (_err) {
+    return null
+  }
+}
+
 /** Test-mode overrides: force a state so the UI can be verified without real data. */
 const TEST_MODES = new Set(['low', 'peak', 'peakLow', 'near', 'far', 'nokey', 'error', 'empty'])
 
@@ -260,6 +289,7 @@ export default {
     root.inject(['webServer', 'credentials'], (ctx) => {
       let balanceCache = { at: 0, value: null }
       let usageCache = { at: 0, value: { status: 'no-account' } }
+      let alertCache = { at: 0, value: null }
 
       const sessionModel = new Map() // sessionId -> model
       let observedSpend = 0
@@ -377,6 +407,16 @@ export default {
         }
         const platform = usageResult.status === 'ok' ? platformCost(usageResult.payload) : null
 
+        let alert = alertCache.value
+        if (alert === null || now - alertCache.at >= ALERT_TTL_MS) {
+          alert = await fetchAlertBound(ctx.get('deepseekAccount'))
+          alertCache = { at: now, value: alert }
+        }
+        // Prefer the platform-configured "余额预警" bound; fall back to the plugin config.
+        const lowBalance = alert !== null
+          ? { cny: alert.CNY.enabled ? alert.CNY.bound : 0, usd: alert.USD.enabled ? alert.USD.bound : 0 }
+          : { cny: lowBalanceCNY, usd: lowBalanceUSD }
+
         const sessionId = query.get('session') || ''
         const model = sessionId ? (sessionModel.get(sessionId) || '') : ''
 
@@ -409,7 +449,8 @@ export default {
           source,
           model,
           price: priceInfo(model),
-          lowBalance: { cny: lowBalanceCNY, usd: lowBalanceUSD },
+          lowBalance,
+          alertRaw: alert !== null ? alert.raw : null,
           refreshedAt: now,
         }
         persistToday()
