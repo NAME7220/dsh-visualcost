@@ -18,7 +18,7 @@ const BALANCE_TTL_MS = 60_000
 const BALANCE_TIMEOUT_MS = 10_000
 const USAGE_TTL_MS = 2 * 60_000
 const USAGE_TIMEOUT_MS = 10_000
-const ALERT_TTL_MS = 5 * 60_000
+const ALERT_TTL_MS = 60_000
 const PLATFORM_USAGE_URL = 'https://platform.deepseek.com/api/v0/usage/by_api_key/cost'
 const TZ_SECONDS = 8 * 3600
 
