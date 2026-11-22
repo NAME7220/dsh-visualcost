@@ -83,13 +83,6 @@ icon.svg          plugin icon
 - The `conversation.composer.dock` slot, provided by `@deepseek-ai/dsh-client-ui-conversation`.
 - A configured `DEEPSEEK_API_KEY` credential, and a signed-in DeepSeek account for the platform figures.
 
-## Releasing
-
-1. Bump `version` in `package.json`.
-2. Commit, then tag: `git tag -a v1.0.0 -m "dsh-visualcost 1.0.0"`.
-3. Push both: `git push && git push origin v1.0.0`.
-4. On GitHub, draft a release for that tag.
-
 ## License
 
 MIT — see [LICENSE](LICENSE).

@@ -76,13 +76,6 @@ icon.svg          插件图标
 - `conversation.composer.dock` 插槽（由 `@deepseek-ai/dsh-client-ui-conversation` 提供）。
 - 已配置的 `DEEPSEEK_API_KEY` 凭据，以及已登录的 DeepSeek 账号（用于读取平台官方数据）。
 
-## 发布
-
-1. 修改 `package.json` 里的 `version`。
-2. 提交后打标签：`git tag -a v1.0.0 -m "dsh-visualcost 1.0.0"`。
-3. 一并推送：`git push && git push origin v1.0.0`。
-4. 在 GitHub 上为该标签草拟一个 release。
-
 ## 许可
 
 MIT —— 见 [LICENSE](LICENSE)。
