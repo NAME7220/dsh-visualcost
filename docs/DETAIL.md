@@ -38,10 +38,10 @@ GET platform.deepseek.com/api/v0/usage/by_api_key/cost
 
 - 宿主注册只读路由 `/api-balance/status.json?session=<id>`，返回 `{ period, nextTransitionMs, balance, todaySpend, byModel, source, model, price }`；浏览器每 60 秒轮询。
 - 余额每 60 秒拉取；平台用量每 2 分钟拉取。
-- 峰谷计算、单价、节假日清单、预警线均为源码顶部常量。
+- 峰谷计算、单价、预警线为源码顶部常量；节假日清单运行时从公开数据源拉取并缓存。
 
 ## 限制
 
 - 平台用量接口为**私有网页接口**，随时可能变更；失效时自动走本地兜底。
 - 需要 DSH 已登录 DeepSeek 账号（有登录态 token）才能取平台官方值。
-- 节假日清单为内置 2026 年安排；以后年度需补录 `HOLIDAYS`。
+- 节假日清单不内置：每个北京日首次读取时从 [`NateScarlet/holiday-cn`](https://github.com/NateScarlet/holiday-cn) 拉取当年 JSON 并缓存；拉取失败沿用旧缓存，15 分钟后重试；临近跨年时顺带拉下一年。

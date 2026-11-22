@@ -28,18 +28,47 @@ const PEAK_WINDOWS_MIN = [
   [14 * 60, 18 * 60],
 ]
 
-// 2026 年中国法定节假日「放假」日期（国办发明电〔2025〕7 号）。以后年度请在此补录。
-const HOLIDAYS = new Set([
-  '2026-01-01', '2026-01-02', '2026-01-03',
-  '2026-02-15', '2026-02-16', '2026-02-17', '2026-02-18', '2026-02-19',
-  '2026-02-20', '2026-02-21', '2026-02-22', '2026-02-23',
-  '2026-04-04', '2026-04-05', '2026-04-06',
-  '2026-05-01', '2026-05-02', '2026-05-03', '2026-05-04', '2026-05-05',
-  '2026-06-19', '2026-06-20', '2026-06-21',
-  '2026-09-25', '2026-09-26', '2026-09-27',
-  '2026-10-01', '2026-10-02', '2026-10-03', '2026-10-04', '2026-10-05',
-  '2026-10-06', '2026-10-07',
-])
+// 法定节假日不内置：按北京日期「每天首次读取」时从公开数据源拉全年 JSON 并缓存（数据很小），
+// 拉取失败时按 15 分钟退避重试；接近年末再顺带拉下一年，覆盖跨年切换。
+const HOLIDAY_URL = 'https://cdn.jsdelivr.net/gh/NateScarlet/holiday-cn@master'
+const HOLIDAY_TIMEOUT_MS = 10_000
+const HOLIDAY_RETRY_MS = 15 * 60 * 1000
+let holidaySet = new Set()
+let holidayDate = ''
+let holidayAttempt = 0
+
+async function fetchHolidays(year) {
+  try {
+    const response = await fetch(`${HOLIDAY_URL}/${year}.json`, { signal: AbortSignal.timeout(HOLIDAY_TIMEOUT_MS) })
+    if (!response.ok) return null
+    const json = await response.json()
+    const days = Array.isArray(json && json.days) ? json.days : []
+    const set = new Set()
+    for (const day of days) {
+      if (day && day.isOffDay === true && typeof day.date === 'string') set.add(day.date)
+    }
+    return set
+  } catch (_err) {
+    return null
+  }
+}
+
+async function ensureHolidays(now) {
+  const facts = beijingFacts(now)
+  if (holidayDate === facts.date) return
+  if (holidayAttempt !== 0 && now - holidayAttempt < HOLIDAY_RETRY_MS) return
+  holidayAttempt = now
+  const year = Number(facts.date.slice(0, 4))
+  const current = await fetchHolidays(String(year))
+  if (current === null) return
+  let merged = current
+  if (Number(facts.date.slice(5, 7)) >= 11) {
+    const next = await fetchHolidays(String(year + 1))
+    if (next !== null) merged = new Set([...current, ...next])
+  }
+  holidaySet = merged
+  holidayDate = facts.date
+}
 
 // DeepSeek 单价（元 / 百万 token），顺序 [低谷, 高峰]。
 const FLASH_PRICE = { hit: [0.02, 0.04], miss: [1, 2], out: [4, 8] }
@@ -67,7 +96,7 @@ function beijingFacts(epochMs) {
 function isPeak(epochMs) {
   const facts = beijingFacts(epochMs)
   if (facts.weekday === 0 || facts.weekday === 6) return false
-  if (HOLIDAYS.has(facts.date)) return false
+  if (holidaySet.has(facts.date)) return false
   return PEAK_WINDOWS_MIN.some(([start, end]) => facts.minutes >= start && facts.minutes < end)
 }
 
@@ -372,6 +401,7 @@ export default {
         const now = Date.now()
         const facts = beijingFacts(now)
         maybeResetToday(now)
+        await ensureHolidays(now)
 
         let query
         try { query = new URL(req.url || '/', 'http://localhost').searchParams } catch (_err) { query = new URLSearchParams() }

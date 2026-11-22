@@ -43,7 +43,7 @@ Developed and verified against **DeepSeek Harness `0.2.2-rc.5`** (Windows deskto
 | Peak | Mon–Fri 09:00–12:00 and 14:00–18:00, excluding statutory holidays | standard |
 | Off-peak | everything else (weekends, holidays, makeup weekends) | half |
 
-Holidays are a hard-coded 2026 list in `index.js` (`HOLIDAYS`); add later years there.
+Holidays are **not embedded**: on the first read of each Beijing day the plugin fetches that year's calendar from [`NateScarlet/holiday-cn`](https://github.com/NateScarlet/holiday-cn) and caches it in memory. A failed fetch keeps the previous cache and retries after 15 minutes; near year-end the next year is fetched too.
 
 ## Install
 
