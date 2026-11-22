@@ -38,6 +38,8 @@ window.__ModuleLoader__.load({
       testPeakLow: '高峰低余额',
       testNear: '临近切换',
       testFar: '跨天切换',
+      alertOff: '余额预警未开启',
+      settings: '设置',
     }
     const en = {
       peak: 'Peak',
@@ -64,6 +66,8 @@ window.__ModuleLoader__.load({
       testPeakLow: 'Peak+low',
       testNear: 'Near switch',
       testFar: 'Days away',
+      alertOff: 'Balance alert off',
+      settings: 'Settings',
     }
 
     const CSS = `
@@ -93,6 +97,10 @@ window.__ModuleLoader__.load({
 .api-balance-test-btn{margin:0;padding:1px 6px;border:1px solid var(--dsw-alias-border-l2);border-radius:4px;background:transparent;color:var(--dsw-alias-label-tertiary);font:inherit;font-size:11px;line-height:16px;cursor:pointer}
 .api-balance-test-btn:hover{color:var(--dsw-alias-label-secondary);border-color:var(--dsw-alias-border-l1)}
 .api-balance-test-on{color:var(--dsw-alias-label-primary);border-color:var(--dsw-alias-label-primary);font-weight:500}
+.api-balance-alert{display:flex;align-items:center;gap:6px;padding:2px 0;color:#ef4444}
+.api-balance-alert-text{color:#ef4444}
+.api-balance-settings{margin-left:auto;color:var(--dsw-alias-label-secondary);text-decoration:none;border-bottom:1px solid var(--dsw-alias-border-l2);cursor:pointer}
+.api-balance-settings:hover{color:var(--dsw-alias-label-primary)}
 `
 
     function CoinIcon() {
@@ -102,6 +110,14 @@ window.__ModuleLoader__.load({
           d: 'M5.5 5 L8 8 L10.5 5 M8 8 V11 M6 9.6 H10 M6 7.6 H10',
           fill: 'none', stroke: 'currentColor', strokeWidth: 1.2, strokeLinecap: 'round', strokeLinejoin: 'round',
         }),
+      )
+    }
+
+    function AlertIcon() {
+      return h('svg', { viewBox: '0 0 16 16', width: 13, height: 13, style: { flex: 'none', color: '#ef4444' }, 'aria-hidden': true },
+        h('circle', { cx: 8, cy: 8, r: 6.5, fill: 'none', stroke: 'currentColor', strokeWidth: 1.5 }),
+        h('line', { x1: 8, y1: 4.2, x2: 8, y2: 8.6, stroke: 'currentColor', strokeWidth: 1.5, strokeLinecap: 'round' }),
+        h('circle', { cx: 8, cy: 11.3, r: 0.85, fill: 'currentColor' }),
       )
     }
 
@@ -256,6 +272,20 @@ window.__ModuleLoader__.load({
         ),
         bar,
         legend,
+        status.alertEnabled === false ? h('div', {},
+          h('div', { className: 'api-balance-rule', style: { margin: '8px 0 6px' } }),
+          h('div', { className: 'api-balance-alert' },
+            h(AlertIcon),
+            h('span', { className: 'api-balance-alert-text' }, t('alertOff')),
+            h('a', {
+              className: 'api-balance-settings',
+              href: 'https://platform.deepseek.com/usage',
+              target: '_blank',
+              rel: 'noreferrer',
+              onClick: event => event.stopPropagation(),
+            }, t('settings')),
+          ),
+        ) : null,
         h('div', { className: 'api-balance-test' },
           h('span', { className: 'api-balance-test-label' }, t('testMode')),
           [

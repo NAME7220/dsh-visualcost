@@ -450,6 +450,7 @@ export default {
           model,
           price: priceInfo(model),
           lowBalance,
+          alertEnabled: alert !== null ? (alert.CNY.enabled || alert.USD.enabled) : null,
           alertRaw: alert !== null ? alert.raw : null,
           refreshedAt: now,
         }
