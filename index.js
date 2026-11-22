@@ -217,7 +217,7 @@ async function fetchAlertBound(account) {
       if (entry === undefined || entry === null) return { enabled: false, bound: 0 }
       return { enabled: entry.enabled === true, bound: Number(entry.alert_bound) || 0 }
     }
-    return { CNY: read('CNY'), USD: read('USD'), raw: alert }
+    return { CNY: read('CNY'), USD: read('USD') }
   } catch (_err) {
     return null
   }
@@ -451,7 +451,6 @@ export default {
           price: priceInfo(model),
           lowBalance,
           alertEnabled: alert !== null ? (alert.CNY.enabled || alert.USD.enabled) : null,
-          alertRaw: alert !== null ? alert.raw : null,
           refreshedAt: now,
         }
         persistToday()
