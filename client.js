@@ -28,16 +28,6 @@ window.__ModuleLoader__.load({
       days: '天',
       hours: '小时',
       minutes: '分钟',
-      testMode: '测试',
-      testOff: '关',
-      testLow: '低余额',
-      testPeak: '高峰',
-      testNoKey: '无密钥',
-      testError: '错误',
-      testEmpty: '空数据',
-      testPeakLow: '高峰低余额',
-      testNear: '临近切换',
-      testFar: '跨天切换',
       alertOff: '余额预警未开启',
       settings: '设置',
     }
@@ -56,16 +46,6 @@ window.__ModuleLoader__.load({
       days: 'd',
       hours: 'h',
       minutes: 'm',
-      testMode: 'Test',
-      testOff: 'Off',
-      testLow: 'Low balance',
-      testPeak: 'Peak',
-      testNoKey: 'No key',
-      testError: 'Error',
-      testEmpty: 'Empty',
-      testPeakLow: 'Peak+low',
-      testNear: 'Near switch',
-      testFar: 'Days away',
       alertOff: 'Balance alert off',
       settings: 'Settings',
     }
@@ -92,11 +72,6 @@ window.__ModuleLoader__.load({
 .api-balance-strong em{color:var(--dsw-alias-label-primary);font-weight:700}
 .api-balance-row em.api-balance-value{font-weight:500;color:var(--dsw-alias-label-primary)}
 .api-balance-tip{position:fixed;z-index:1200;max-width:min(50vw,calc(100vw - 24px));box-sizing:border-box;padding:3px 7px;border-radius:var(--dsw-radius-sm);background:var(--dsw-alias-tooltip-bg,#333);color:var(--dsw-alias-tooltip-label,#fff);font-size:13px;line-height:20px;white-space:pre-line;overflow-wrap:break-word;pointer-events:none;font-variant-numeric:tabular-nums}
-.api-balance-test{display:flex;flex-wrap:wrap;align-items:center;gap:4px;margin-top:10px;padding-top:8px;border-top:0.5px solid var(--dsw-alias-border-l2)}
-.api-balance-test-label{margin-right:2px;color:var(--dsw-alias-label-tertiary)}
-.api-balance-test-btn{margin:0;padding:1px 6px;border:1px solid var(--dsw-alias-border-l2);border-radius:4px;background:transparent;color:var(--dsw-alias-label-tertiary);font:inherit;font-size:11px;line-height:16px;cursor:pointer}
-.api-balance-test-btn:hover{color:var(--dsw-alias-label-secondary);border-color:var(--dsw-alias-border-l1)}
-.api-balance-test-on{color:var(--dsw-alias-label-primary);border-color:var(--dsw-alias-label-primary);font-weight:500}
 .api-balance-alert{display:flex;align-items:center;gap:6px;padding:2px 0;color:#ef4444}
 .api-balance-alert-text{color:#ef4444}
 .api-balance-settings{margin-left:auto;color:var(--dsw-alias-label-secondary);text-decoration:none;border-bottom:1px solid var(--dsw-alias-border-l2);cursor:pointer}
@@ -230,7 +205,7 @@ window.__ModuleLoader__.load({
       return { open, toggle, measure, pos, anchorRef, panelRef }
     }
 
-    function renderDialog(status, t, testMode, setTestMode) {
+    function renderDialog(status, t) {
       const byModel = status.byModel || []
       const sum = byModel.reduce((total, item) => total + (Number(item.cost) || 0), 0)
       const bar = sum > 0
@@ -286,25 +261,6 @@ window.__ModuleLoader__.load({
             }, t('settings')),
           ),
         ) : null,
-        h('div', { className: 'api-balance-test' },
-          h('span', { className: 'api-balance-test-label' }, t('testMode')),
-          [
-            ['', t('testOff')],
-            ['low', t('testLow')],
-            ['peak', t('testPeak')],
-            ['peakLow', t('testPeakLow')],
-            ['near', t('testNear')],
-            ['far', t('testFar')],
-            ['nokey', t('testNoKey')],
-            ['error', t('testError')],
-            ['empty', t('testEmpty')],
-          ].map(([mode, label]) => h('button', {
-            key: mode || 'off',
-            type: 'button',
-            className: `api-balance-test-btn${testMode === mode ? ' api-balance-test-on' : ''}`,
-            onClick: () => setTestMode(mode),
-          }, label)),
-        ),
       )
     }
 
@@ -313,18 +269,13 @@ window.__ModuleLoader__.load({
       const pop = useAnchorPop()
       const [hover, setHover] = useState(false)
       const [tip, setTip] = useState({ bottom: 0, left: 0 })
-      const [testMode, setTestMode] = useState('')
 
       useEffect(() => {
         let alive = true
         let timer
-        const params = new URLSearchParams()
-        if (sessionId) params.set('session', String(sessionId))
-        if (testMode) params.set('test', testMode)
-        const query = params.toString()
-        const url = `/api-balance/status.json${query ? `?${query}` : ''}`
+        const query = sessionId ? `?session=${encodeURIComponent(sessionId)}` : ''
         const load = () => {
-          fetch(url)
+          fetch(`/api-balance/status.json${query}`)
             .then(response => response.json())
             .then((value) => { if (alive) setStatus(value) })
             .catch(() => { /* keep last value; retry next tick */ })
@@ -332,7 +283,7 @@ window.__ModuleLoader__.load({
         load()
         timer = setInterval(load, POLL_MS)
         return () => { alive = false; clearInterval(timer) }
-      }, [sessionId, testMode])
+      }, [sessionId])
 
       const enter = () => {
         const el = pop.anchorRef.current
@@ -387,7 +338,7 @@ window.__ModuleLoader__.load({
             role: 'dialog',
             'aria-label': reading,
             style: { bottom: pop.pos.bottom, left: pop.pos.left },
-          }, renderDialog(status, t, testMode, setTestMode)),
+          }, renderDialog(status, t)),
           document.body,
         ) : null,
       )
