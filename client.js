@@ -96,18 +96,35 @@ window.__ModuleLoader__.load({
       )
     }
 
+    function withSeparators(text) {
+      const [int, dec] = String(text).split('.')
+      return int.replace(/\B(?=(\d{3})+(?!\d))/g, ',') + (dec !== undefined ? `.${dec}` : '')
+    }
+
     function money(currency, amount) {
       const value = Number(amount)
-      const text = Number.isFinite(value) ? value.toFixed(2) : String(amount)
+      const text = Number.isFinite(value) ? withSeparators(value.toFixed(2)) : String(amount)
       if (currency === 'CNY') return `¥${text}`
       if (currency === 'USD') return `$${text}`
       return `${currency} ${text}`
     }
 
+    // 胶囊用：大数压缩成 K/M/B，避免把状态栏撑坏。
+    function compactMoney(currency, amount) {
+      const value = Number(amount)
+      if (!Number.isFinite(value)) return `${currency} ${amount}`
+      const abs = Math.abs(value)
+      const symbol = currency === 'CNY' ? '¥' : currency === 'USD' ? '$' : `${currency} `
+      if (abs >= 1e9) return `${symbol}${(value / 1e9).toFixed(2)}B`
+      if (abs >= 1e6) return `${symbol}${(value / 1e6).toFixed(2)}M`
+      if (abs >= 1e4) return `${symbol}${(value / 1e3).toFixed(2)}K`
+      return `${symbol}${value.toFixed(2)}`
+    }
+
     function cny(value) {
       const number = Number(value)
       if (!Number.isFinite(number)) return '¥—'
-      return `¥${Math.abs(number) < 1 ? number.toFixed(4) : number.toFixed(2)}`
+      return `¥${withSeparators(Math.abs(number) < 1 ? number.toFixed(4) : number.toFixed(2))}`
     }
 
     function balanceLabel(balance, t) {
@@ -117,7 +134,7 @@ window.__ModuleLoader__.load({
       const list = balance.balances || []
       if (list.length === 0) return t('balanceEmpty')
       const preferred = list.find(item => item.currency === 'CNY') || list[0]
-      return money(preferred.currency, preferred.totalBalance)
+      return compactMoney(preferred.currency, preferred.totalBalance)
     }
 
     function balanceIsLow(balance, low) {
