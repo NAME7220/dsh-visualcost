@@ -1,4 +1,7 @@
 - insert:
     - id: dsh-visualcost
       name: dsh-visualcost
-      config: {}
+      config:
+        # 余额预警阈值（元 / 美元）；0 表示关闭该币种的预警。
+        lowBalanceCNY: 100
+        lowBalanceUSD: 15

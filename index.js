@@ -195,11 +195,11 @@ function platformCost(payload) {
 }
 
 /** Test-mode overrides: force a state so the UI can be verified without real data. */
-const TEST_MODES = new Set(['low', 'peak', 'nokey', 'error', 'empty'])
+const TEST_MODES = new Set(['low', 'peak', 'peakLow', 'near', 'far', 'nokey', 'error', 'empty'])
 
 function mockStatus(mode, now) {
   const status = {
-    period: isPeak(now) ? 'peak' : 'valley',
+    period: 'valley',
     nextTransitionMs: nextTransitionMs(now),
     balance: {
       status: 'ok',
@@ -218,21 +218,29 @@ function mockStatus(mode, now) {
     price: priceInfo(''),
     refreshedAt: now,
   }
-  if (mode === 'low') {
+  if (mode === 'low' || mode === 'peakLow') {
     status.balance = {
       status: 'ok',
       isAvailable: true,
       balances: [{ currency: 'CNY', totalBalance: '5.00', grantedBalance: '0.00', toppedUpBalance: '5.00' }],
       error: null,
     }
-  } else if (mode === 'peak') {
+  }
+  if (mode === 'peak' || mode === 'peakLow') {
     status.period = 'peak'
     status.nextTransitionMs = 2 * 3600 * 1000
-  } else if (mode === 'nokey') {
-    status.balance = { status: 'no-key', isAvailable: null, balances: null, error: null }
-  } else if (mode === 'error') {
-    status.balance = { status: 'error', isAvailable: null, balances: null, error: 'HTTP 500' }
-  } else if (mode === 'empty') {
+  }
+  if (mode === 'near') {
+    status.period = 'peak'
+    status.nextTransitionMs = 5 * 60 * 1000
+  }
+  if (mode === 'far') {
+    status.period = 'valley'
+    status.nextTransitionMs = (2 * 24 + 15) * 3600 * 1000
+  }
+  if (mode === 'nokey') status.balance = { status: 'no-key', isAvailable: null, balances: null, error: null }
+  if (mode === 'error') status.balance = { status: 'error', isAvailable: null, balances: null, error: 'HTTP 500' }
+  if (mode === 'empty') {
     status.todaySpend = 0
     status.byModel = []
   }
@@ -241,7 +249,14 @@ function mockStatus(mode, now) {
 
 export default {
   name: 'dsh-visualcost',
-  apply(root) {
+  apply(root, config) {
+    const pick = (value, fallback) => {
+      const n = Number(value)
+      return Number.isFinite(n) && n >= 0 ? n : fallback
+    }
+    // 余额预警阈值：0 表示关闭预警；可在 cordis.patch.yml 里改。
+    const lowBalanceCNY = pick(config && config.lowBalanceCNY, 100)
+    const lowBalanceUSD = pick(config && config.lowBalanceUSD, 15)
     root.inject(['webServer', 'credentials'], (ctx) => {
       let balanceCache = { at: 0, value: null }
       let usageCache = { at: 0, value: { status: 'no-account' } }
@@ -332,8 +347,10 @@ export default {
         try { query = new URL(req.url || '/', 'http://localhost').searchParams } catch (_err) { query = new URLSearchParams() }
         const test = query.get('test') || ''
         if (TEST_MODES.has(test)) {
+          const mock = mockStatus(test, now)
+          mock.lowBalance = { cny: lowBalanceCNY, usd: lowBalanceUSD }
           res.writeHead(200, JSON_HEADERS)
-          res.end(JSON.stringify(mockStatus(test, now)))
+          res.end(JSON.stringify(mock))
           return
         }
 
@@ -392,8 +409,8 @@ export default {
           source,
           model,
           price: priceInfo(model),
+          lowBalance: { cny: lowBalanceCNY, usd: lowBalanceUSD },
           refreshedAt: now,
-
         }
         persistToday()
         res.writeHead(200, JSON_HEADERS)

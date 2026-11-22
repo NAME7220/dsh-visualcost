@@ -35,6 +35,9 @@ window.__ModuleLoader__.load({
       testNoKey: '无密钥',
       testError: '错误',
       testEmpty: '空数据',
+      testPeakLow: '高峰低余额',
+      testNear: '临近切换',
+      testFar: '跨天切换',
     }
     const en = {
       peak: 'Peak',
@@ -58,6 +61,9 @@ window.__ModuleLoader__.load({
       testNoKey: 'No key',
       testError: 'Error',
       testEmpty: 'Empty',
+      testPeakLow: 'Peak+low',
+      testNear: 'Near switch',
+      testFar: 'Days away',
     }
 
     const CSS = `
@@ -123,13 +129,19 @@ window.__ModuleLoader__.load({
       return money(preferred.currency, preferred.totalBalance)
     }
 
-    function balanceIsLow(balance) {
+    function balanceIsLow(balance, low) {
       if (balance === null || balance === undefined || balance.status !== 'ok') return false
       if (balance.isAvailable === false) return true
-      const cnyEntry = (balance.balances || []).find(item => item.currency === 'CNY')
-      if (cnyEntry && Number(cnyEntry.totalBalance) < LOW_CNY) return true
-      const usdEntry = (balance.balances || []).find(item => item.currency === 'USD')
-      if (usdEntry && Number(usdEntry.totalBalance) < LOW_USD) return true
+      const cnyLimit = low !== null && low !== undefined && Number.isFinite(Number(low.cny)) ? Number(low.cny) : LOW_CNY
+      const usdLimit = low !== null && low !== undefined && Number.isFinite(Number(low.usd)) ? Number(low.usd) : LOW_USD
+      if (cnyLimit > 0) {
+        const cnyEntry = (balance.balances || []).find(item => item.currency === 'CNY')
+        if (cnyEntry && Number(cnyEntry.totalBalance) < cnyLimit) return true
+      }
+      if (usdLimit > 0) {
+        const usdEntry = (balance.balances || []).find(item => item.currency === 'USD')
+        if (usdEntry && Number(usdEntry.totalBalance) < usdLimit) return true
+      }
       return false
     }
 
@@ -250,6 +262,9 @@ window.__ModuleLoader__.load({
             ['', t('testOff')],
             ['low', t('testLow')],
             ['peak', t('testPeak')],
+            ['peakLow', t('testPeakLow')],
+            ['near', t('testNear')],
+            ['far', t('testFar')],
             ['nokey', t('testNoKey')],
             ['error', t('testError')],
             ['empty', t('testEmpty')],
@@ -308,7 +323,7 @@ window.__ModuleLoader__.load({
       const balanceText = balanceLabel(status.balance, t)
       const periodText = status.period === 'peak' ? t('peak') : t('valley')
       const dotColor = status.period === 'peak' ? '#f59e0b' : '#10b981'
-      const low = balanceIsLow(status.balance)
+      const low = balanceIsLow(status.balance, status.lowBalance)
       const countdown = formatCountdown(remainingMs(status), t)
       const reading = `${balanceText} · ${periodText}`
 
