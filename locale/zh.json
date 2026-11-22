@@ -1,0 +1,7 @@
+{
+  "meta": {
+    "title": "API 余额与峰谷时段",
+    "description": "在下方输入栏的状态条增加一个胶囊，显示 DeepSeek API 余额（通过 DEEPSEEK_API_KEY 凭据读取 /user/balance）以及当前处于高峰还是低谷时段。高峰为北京时间周一至周五 09:00–12:00 与 14:00–18:00（不含法定节假日）。",
+    "detail": "docs/DETAIL.md"
+  }
+}

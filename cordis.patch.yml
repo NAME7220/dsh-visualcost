@@ -1,0 +1,4 @@
+- insert:
+    - id: dsh-visualcost
+      name: dsh-visualcost
+      config: {}

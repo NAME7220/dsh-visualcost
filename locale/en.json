@@ -1,0 +1,7 @@
+{
+  "meta": {
+    "title": "API balance and pricing period",
+    "description": "Adds a pill to the composer status bar showing the DeepSeek API balance (read from /user/balance using the DEEPSEEK_API_KEY credential) and the current peak or off-peak pricing period. Peak is weekdays 09:00–12:00 and 14:00–18:00 Beijing time, excluding Chinese statutory holidays.",
+    "detail": "docs/DETAIL.md"
+  }
+}
