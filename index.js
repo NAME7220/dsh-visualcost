@@ -194,8 +194,53 @@ function platformCost(payload) {
   return { total: round4(total), byModel }
 }
 
+/** Test-mode overrides: force a state so the UI can be verified without real data. */
+const TEST_MODES = new Set(['low', 'peak', 'nokey', 'error', 'empty'])
+
+function mockStatus(mode, now) {
+  const status = {
+    period: isPeak(now) ? 'peak' : 'valley',
+    nextTransitionMs: nextTransitionMs(now),
+    balance: {
+      status: 'ok',
+      isAvailable: true,
+      balances: [{ currency: 'CNY', totalBalance: '62.59', grantedBalance: '0.00', toppedUpBalance: '62.59' }],
+      error: null,
+    },
+    todaySpend: 19.5026,
+    byModel: [
+      { model: 'deepseek-v4-pro', cost: 12.9168 },
+      { model: 'deepseek-flash', cost: 6.5708 },
+      { model: 'tool-search', cost: 0.015 },
+    ],
+    source: 'test',
+    model: '',
+    price: priceInfo(''),
+    refreshedAt: now,
+  }
+  if (mode === 'low') {
+    status.balance = {
+      status: 'ok',
+      isAvailable: true,
+      balances: [{ currency: 'CNY', totalBalance: '5.00', grantedBalance: '0.00', toppedUpBalance: '5.00' }],
+      error: null,
+    }
+  } else if (mode === 'peak') {
+    status.period = 'peak'
+    status.nextTransitionMs = 2 * 3600 * 1000
+  } else if (mode === 'nokey') {
+    status.balance = { status: 'no-key', isAvailable: null, balances: null, error: null }
+  } else if (mode === 'error') {
+    status.balance = { status: 'error', isAvailable: null, balances: null, error: 'HTTP 500' }
+  } else if (mode === 'empty') {
+    status.todaySpend = 0
+    status.byModel = []
+  }
+  return status
+}
+
 export default {
-  name: 'api-balance',
+  name: 'dsh-visualcost',
   apply(root) {
     root.inject(['webServer', 'credentials'], (ctx) => {
       let balanceCache = { at: 0, value: null }
@@ -283,6 +328,15 @@ export default {
         const facts = beijingFacts(now)
         maybeResetToday(now)
 
+        let query
+        try { query = new URL(req.url || '/', 'http://localhost').searchParams } catch (_err) { query = new URLSearchParams() }
+        const test = query.get('test') || ''
+        if (TEST_MODES.has(test)) {
+          res.writeHead(200, JSON_HEADERS)
+          res.end(JSON.stringify(mockStatus(test, now)))
+          return
+        }
+
         let balance = balanceCache.value
         if (balance === null || now - balanceCache.at >= BALANCE_TTL_MS) {
           try {
@@ -306,11 +360,7 @@ export default {
         }
         const platform = usageResult.status === 'ok' ? platformCost(usageResult.payload) : null
 
-        let sessionId = ''
-        try {
-          sessionId = new URL(req.url || '/', 'http://localhost').searchParams.get('session') || ''
-        } catch (_err) { /* 忽略无法解析的查询串 */ }
-
+        const sessionId = query.get('session') || ''
         const model = sessionId ? (sessionModel.get(sessionId) || '') : ''
 
         let todaySpend

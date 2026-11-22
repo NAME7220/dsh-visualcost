@@ -28,6 +28,13 @@ window.__ModuleLoader__.load({
       days: '天',
       hours: '小时',
       minutes: '分钟',
+      testMode: '测试',
+      testOff: '关',
+      testLow: '低余额',
+      testPeak: '高峰',
+      testNoKey: '无密钥',
+      testError: '错误',
+      testEmpty: '空数据',
     }
     const en = {
       peak: 'Peak',
@@ -44,6 +51,13 @@ window.__ModuleLoader__.load({
       days: 'd',
       hours: 'h',
       minutes: 'm',
+      testMode: 'Test',
+      testOff: 'Off',
+      testLow: 'Low balance',
+      testPeak: 'Peak',
+      testNoKey: 'No key',
+      testError: 'Error',
+      testEmpty: 'Empty',
     }
 
     const CSS = `
@@ -68,6 +82,11 @@ window.__ModuleLoader__.load({
 .api-balance-strong em{color:var(--dsw-alias-label-primary);font-weight:700}
 .api-balance-row em.api-balance-value{font-weight:500;color:var(--dsw-alias-label-primary)}
 .api-balance-tip{position:fixed;z-index:1200;max-width:min(50vw,calc(100vw - 24px));box-sizing:border-box;padding:3px 7px;border-radius:var(--dsw-radius-sm);background:var(--dsw-alias-tooltip-bg,#333);color:var(--dsw-alias-tooltip-label,#fff);font-size:13px;line-height:20px;white-space:pre-line;overflow-wrap:break-word;pointer-events:none;font-variant-numeric:tabular-nums}
+.api-balance-test{display:flex;flex-wrap:wrap;align-items:center;gap:4px;margin-top:10px;padding-top:8px;border-top:0.5px solid var(--dsw-alias-border-l2)}
+.api-balance-test-label{margin-right:2px;color:var(--dsw-alias-label-tertiary)}
+.api-balance-test-btn{margin:0;padding:1px 6px;border:1px solid var(--dsw-alias-border-l2);border-radius:4px;background:transparent;color:var(--dsw-alias-label-tertiary);font:inherit;font-size:11px;line-height:16px;cursor:pointer}
+.api-balance-test-btn:hover{color:var(--dsw-alias-label-secondary);border-color:var(--dsw-alias-border-l1)}
+.api-balance-test-on{color:var(--dsw-alias-label-primary);border-color:var(--dsw-alias-label-primary);font-weight:500}
 `
 
     function CoinIcon() {
@@ -183,7 +202,7 @@ window.__ModuleLoader__.load({
       return { open, toggle, measure, pos, anchorRef, panelRef }
     }
 
-    function renderDialog(status, t) {
+    function renderDialog(status, t, testMode, setTestMode) {
       const byModel = status.byModel || []
       const sum = byModel.reduce((total, item) => total + (Number(item.cost) || 0), 0)
       const bar = sum > 0
@@ -225,6 +244,22 @@ window.__ModuleLoader__.load({
         ),
         bar,
         legend,
+        h('div', { className: 'api-balance-test' },
+          h('span', { className: 'api-balance-test-label' }, t('testMode')),
+          [
+            ['', t('testOff')],
+            ['low', t('testLow')],
+            ['peak', t('testPeak')],
+            ['nokey', t('testNoKey')],
+            ['error', t('testError')],
+            ['empty', t('testEmpty')],
+          ].map(([mode, label]) => h('button', {
+            key: mode || 'off',
+            type: 'button',
+            className: `api-balance-test-btn${testMode === mode ? ' api-balance-test-on' : ''}`,
+            onClick: () => setTestMode(mode),
+          }, label)),
+        ),
       )
     }
 
@@ -233,13 +268,18 @@ window.__ModuleLoader__.load({
       const pop = useAnchorPop()
       const [hover, setHover] = useState(false)
       const [tip, setTip] = useState({ bottom: 0, left: 0 })
+      const [testMode, setTestMode] = useState('')
 
       useEffect(() => {
         let alive = true
         let timer
-        const query = sessionId ? `?session=${encodeURIComponent(sessionId)}` : ''
+        const params = new URLSearchParams()
+        if (sessionId) params.set('session', String(sessionId))
+        if (testMode) params.set('test', testMode)
+        const query = params.toString()
+        const url = `/api-balance/status.json${query ? `?${query}` : ''}`
         const load = () => {
-          fetch(`/api-balance/status.json${query}`)
+          fetch(url)
             .then(response => response.json())
             .then((value) => { if (alive) setStatus(value) })
             .catch(() => { /* keep last value; retry next tick */ })
@@ -247,7 +287,7 @@ window.__ModuleLoader__.load({
         load()
         timer = setInterval(load, POLL_MS)
         return () => { alive = false; clearInterval(timer) }
-      }, [sessionId])
+      }, [sessionId, testMode])
 
       const enter = () => {
         const el = pop.anchorRef.current
@@ -302,7 +342,7 @@ window.__ModuleLoader__.load({
             role: 'dialog',
             'aria-label': reading,
             style: { bottom: pop.pos.bottom, left: pop.pos.left },
-          }, renderDialog(status, t)),
+          }, renderDialog(status, t, testMode, setTestMode)),
           document.body,
         ) : null,
       )
