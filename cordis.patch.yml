@@ -2,6 +2,7 @@
     - id: dsh-visualcost
       name: dsh-visualcost
       config:
-        # 余额预警阈值（元 / 美元）；0 表示关闭该币种的预警。
-        lowBalanceCNY: 100
-        lowBalanceUSD: 15
+        # 平台预警接口不可用时的兜底阈值（元 / 美元）；0 表示关闭该币种预警。
+        # 正常情况下以官网「余额预警」设置为准。
+        lowBalanceCNY: 10
+        lowBalanceUSD: 2

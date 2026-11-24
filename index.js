@@ -226,29 +226,38 @@ function platformCost(payload) {
 
 /** Read the platform-configured balance alert bound (the "余额预警" set on platform.deepseek.com). */
 async function fetchAlertBound(account) {
-  if (account === undefined || typeof account.getPlatformSession !== 'function') return null
+  if (account === undefined || typeof account.getPlatformSession !== 'function') return { ok: false, reason: 'no-account' }
   let session
-  try { session = await account.getPlatformSession() } catch (_err) { return null }
-  if (session === null || session === undefined) return null
+  try { session = await account.getPlatformSession() } catch (_err) { return { ok: false, reason: 'session-throw' } }
+  if (session === null || session === undefined) return { ok: false, reason: 'signed-out' }
   try {
     const response = await fetch('https://platform.deepseek.com/auth-api/v0/users/current', {
       method: 'GET',
-      headers: { 'x-dsh-auth-token': session.token, ...(session.requestHeaders || {}) },
+      headers: {
+        'x-dsh-auth-token': session.token,
+        ...(session.requestHeaders || {}),
+        // The /auth-api/ endpoints expect the platform client identity headers.
+        'x-client-bundle-id': '',
+        'x-client-platform': 'desktop-win',
+        'x-client-version': '0.2.2-rc.5',
+        'x-client-locale': 'zh_CN',
+        'x-client-timezone-offset': String(8 * 3600),
+      },
       signal: AbortSignal.timeout(USAGE_TIMEOUT_MS),
     })
-    if (!response.ok) return null
+    if (!response.ok) return { ok: false, reason: 'http-' + response.status }
     const json = await response.json()
     const biz = json && json.data ? json.data.biz_data : undefined
     const alert = biz && biz.balance_alert ? biz.balance_alert : undefined
-    if (alert === undefined || alert === null) return null
+    if (alert === undefined || alert === null) return { ok: false, reason: 'no-balance-alert' }
     const read = (side) => {
       const entry = alert[side]
       if (entry === undefined || entry === null) return { enabled: false, bound: 0 }
       return { enabled: entry.enabled === true, bound: Number(entry.alert_bound) || 0 }
     }
-    return { CNY: read('CNY'), USD: read('USD') }
+    return { ok: true, CNY: read('CNY'), USD: read('USD') }
   } catch (_err) {
-    return null
+    return { ok: false, reason: 'fetch-throw' }
   }
 }
 
@@ -312,13 +321,14 @@ export default {
       const n = Number(value)
       return Number.isFinite(n) && n >= 0 ? n : fallback
     }
-    // 余额预警阈值：0 表示关闭预警；可在 cordis.patch.yml 里改。
-    const lowBalanceCNY = pick(config && config.lowBalanceCNY, 100)
-    const lowBalanceUSD = pick(config && config.lowBalanceUSD, 15)
+    // 余额预警阈值兜底：平台预警接口不可用时才用；0 表示关闭预警。可在 cordis.patch.yml 里改。
+    const lowBalanceCNY = pick(config && config.lowBalanceCNY, 10)
+    const lowBalanceUSD = pick(config && config.lowBalanceUSD, 2)
     root.inject(['webServer', 'credentials'], (ctx) => {
       let balanceCache = { at: 0, value: null }
       let usageCache = { at: 0, value: { status: 'no-account' } }
       let alertCache = { at: 0, value: null }
+      let alertLast = null
 
       const sessionModel = new Map() // sessionId -> model
       let observedSpend = 0
@@ -441,11 +451,14 @@ export default {
         if (alert === null || now - alertCache.at >= ALERT_TTL_MS) {
           alert = await fetchAlertBound(ctx.get('deepseekAccount'))
           alertCache = { at: now, value: alert }
+          if (alert.ok) alertLast = alert
         }
-        // Prefer the platform-configured "余额预警" bound; fall back to the plugin config.
-        const lowBalance = alert !== null
-          ? { cny: alert.CNY.enabled ? alert.CNY.bound : 0, usd: alert.USD.enabled ? alert.USD.bound : 0 }
+        // Prefer the live platform value; fall back to the last known good one, then the plugin config.
+        const chosen = alert.ok ? alert : alertLast
+        const lowBalance = chosen !== null && chosen !== undefined
+          ? { cny: chosen.CNY.enabled ? chosen.CNY.bound : 0, usd: chosen.USD.enabled ? chosen.USD.bound : 0 }
           : { cny: lowBalanceCNY, usd: lowBalanceUSD }
+        const alertReason = alert.ok ? null : alert.reason
 
         const sessionId = query.get('session') || ''
         const model = sessionId ? (sessionModel.get(sessionId) || '') : ''
@@ -480,7 +493,8 @@ export default {
           model,
           price: priceInfo(model),
           lowBalance,
-          alertEnabled: alert !== null ? (alert.CNY.enabled || alert.USD.enabled) : null,
+          alertEnabled: chosen !== null && chosen !== undefined ? (chosen.CNY.enabled || chosen.USD.enabled) : null,
+          alertReason,
           refreshedAt: now,
         }
         persistToday()
